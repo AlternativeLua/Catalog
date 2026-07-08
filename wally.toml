@@ -1,0 +1,14 @@
+[package]
+name = "alternativelua/catalog"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+license = "MIT"
+description = "Catalog library"
+
+# Runtime dependencies go here, e.g.
+#   Signal = "sleitnick/signal@1.5.0"
+[dependencies]
+
+# Tooling only used while developing/testing this library.
+[dev-dependencies]

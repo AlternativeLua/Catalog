@@ -1,0 +1,33 @@
+{
+  "name": "Catalog-Dev",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Catalog": {
+        "$path": "src"
+      }
+    },
+
+    "ServerScriptService": {
+      "TestRunner": {
+        "$path": "test"
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "FilteringEnabled": true
+      },
+      "Baseplate": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Locked": true,
+          "Position": [0, -10, 0],
+          "Size": [512, 20, 512]
+        }
+      }
+    }
+  }
+}
