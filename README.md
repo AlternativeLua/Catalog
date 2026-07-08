@@ -3,6 +3,8 @@ A fast library for searching a large group of items
 
 ## Usage
 
+Install via wally: `catalog = "alternativelua/catalog@0.1.0"` or through releases
+
 ```luau
 local Catalog = require(ReplicatedStorage.Catalog)
 
