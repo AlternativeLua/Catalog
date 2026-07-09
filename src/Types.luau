@@ -10,6 +10,15 @@ export type Item = {
 
 export type SearchParams = { [string]: Value }
 
+export type SortDirection = "ascending" | "descending"
+
+export type SortKey = {
+	parameter: string,
+	direction: SortDirection?,
+}
+
+export type SortOptions = SortKey | { SortKey }
+
 export type Predicate = (item: Item) -> boolean
 
 export type CatalogData = {

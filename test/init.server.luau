@@ -70,6 +70,24 @@ bench("SearchText name ~ '<no match>'", 20, function()
 	return Catalog.SearchText(cat, "name", "zzzznomatch")
 end)
 
+print("custom search (predicate, O(n) scan):")
+bench("SearchCustom tier >= 90", 20, function()
+	return Catalog.SearchCustom(cat, function(item)
+		return (item.parameters.tier :: number) >= 90
+	end)
+end)
+
+print("sorted search:")
+bench("Search { weapon } sort tier desc", 50, function()
+	return Catalog.Search(cat, { category = "weapon" }, { parameter = "tier", direction = "descending" })
+end)
+bench("Search { weapon } sort multi-key", 50, function()
+	return Catalog.Search(cat, { category = "weapon" }, {
+		{ parameter = "rarity" },
+		{ parameter = "tier", direction = "descending" },
+	})
+end)
+
 print("direct lookup:")
 bench("Get item_50000", 100000, function()
 	return Catalog.Get(cat, "item_50000")

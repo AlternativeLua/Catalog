@@ -5,11 +5,16 @@
 local Types = require(script.Types)
 local Version = require(script.Version)
 local SearchImpl = require(script.Search)
+local SortImpl = require(script.Sort)
 local BoyerMoore = require(script.BoyerMoore)
 
 export type Item = Types.Item
 export type SearchParams = Types.SearchParams
 export type CatalogData = Types.CatalogData
+export type Predicate = Types.Predicate
+export type SortDirection = Types.SortDirection
+export type SortKey = Types.SortKey
+export type SortOptions = Types.SortOptions
 
 local Catalog = {}
 
@@ -36,7 +41,7 @@ local function indexItem(self: CatalogData, item: Item)
 	local indexed = self.indexed
 	for parameter, value in item.parameters do
 		if indexed and not indexed[parameter] then
-			continue 
+			continue
 		end
 
 		local byValue = self.index[parameter]
@@ -117,11 +122,15 @@ function Catalog.Has(self: CatalogData, id: string): boolean
 	return self.byId[id] ~= nil
 end
 
-function Catalog.Search(self: CatalogData, params: SearchParams): { Item }
-	return SearchImpl(self, params)
+function Catalog.Search(self: CatalogData, params: SearchParams, sort: SortOptions?): { Item }
+	local results = SearchImpl(self, params)
+	if sort then
+		SortImpl(results, sort)
+	end
+	return results
 end
 
-function Catalog.SearchText(self: CatalogData, parameter: string, pattern: string): { Item }
+function Catalog.SearchText(self: CatalogData, parameter: string, pattern: string, sort: SortOptions?): { Item }
 	local matcher = BoyerMoore.compile(pattern)
 	local results: { Item } = {}
 
@@ -132,7 +141,28 @@ function Catalog.SearchText(self: CatalogData, parameter: string, pattern: strin
 		end
 	end
 
+	if sort then
+		SortImpl(results, sort)
+	end
 	return results
+end
+
+function Catalog.SearchCustom(self: CatalogData, predicate: Types.Predicate, sort: SortOptions?): { Item }
+	local results: { Item } = {}
+	for _, item in self.byId do
+		if predicate(item) then
+			table.insert(results, item)
+		end
+	end
+
+	if sort then
+		SortImpl(results, sort)
+	end
+	return results
+end
+
+function Catalog.Sort(items: { Item }, options: SortOptions): { Item }
+	return SortImpl(items, options)
 end
 
 function Catalog.Destroy(self: CatalogData)
