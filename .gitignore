@@ -11,3 +11,7 @@ sourcemap.json
 # Wally-installed dependencies
 /Packages/
 /DevPackages/
+
+# npm
+node_modules/
+*.tgz

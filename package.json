@@ -1,0 +1,33 @@
+{
+	"name": "@rbxts/catalog",
+	"version": "0.3.0",
+	"description": "A fast library for searching a large group of items",
+	"main": "src/init.luau",
+	"types": "index.d.ts",
+	"files": [
+		"src",
+		"index.d.ts"
+	],
+	"keywords": [
+		"roblox",
+		"roblox-ts",
+		"rbxts",
+		"luau",
+		"search",
+		"inverted-index",
+		"catalog"
+	],
+	"author": "AlternativeLua",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/AlternativeLua/Catalog.git"
+	},
+	"bugs": {
+		"url": "https://github.com/AlternativeLua/Catalog/issues"
+	},
+	"homepage": "https://github.com/AlternativeLua/Catalog#readme",
+	"publishConfig": {
+		"access": "public"
+	}
+}

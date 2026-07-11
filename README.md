@@ -1,9 +1,12 @@
 # Catalog
 A fast library for searching a large group of items
 
-## Usage
+## Installation
 
-Install via wally: `catalog = "alternativelua/catalog@0.1.0"` or through releases
+- **Wally (Luau):** `catalog = "alternativelua/catalog@0.3.0"` or through releases
+- **npm (roblox-ts):** `npm install @rbxts/catalog`
+
+## Usage
 
 ```luau
 local Catalog = require(ReplicatedStorage.Catalog)
@@ -62,6 +65,40 @@ Catalog.BulkRemoveFromCatalog(cat, { "shield_01" })
 
 -- Clear everything.
 Catalog.Destroy(cat)
+```
+
+## roblox-ts
+
+The npm package ships the same Luau source with TypeScript typings. Type the
+parameters (and optionally the `data` payload) when creating a catalog and
+every search, sort key, and result is checked against them:
+
+```ts
+import Catalog from "@rbxts/catalog";
+
+type ItemParams = { category: string; rarity: string; tier: number; name: string };
+type ItemData = { damage: number };
+
+// `new Catalog(...)` compiles to `Catalog.new(...)`.
+const cat = new Catalog<ItemParams, ItemData>(["category", "rarity", "tier"]);
+
+Catalog.AddToCatalog(cat, {
+	id: "sword_01",
+	parameters: { category: "weapon", rarity: "legendary", tier: 42, name: "Sword" },
+	data: { damage: 120 },
+});
+
+// Typed: `{ categry: "weapon" }` or `{ tier: "42" }` are compile errors.
+const legendaryWeapons = Catalog.Search(cat, { category: "weapon", rarity: "legendary" });
+
+// Sort keys are constrained to keyof ItemParams.
+const ranked = Catalog.Search(cat, { category: "weapon" }, [
+	{ parameter: "rarity" },
+	{ parameter: "tier", direction: "descending" },
+]);
+
+// `item.data` is typed as ItemData | undefined.
+const hardHitters = Catalog.SearchCustom(cat, (item) => item.data !== undefined && item.data.damage > 100);
 ```
 
 ## Performance
