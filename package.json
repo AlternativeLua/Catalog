@@ -1,6 +1,6 @@
 {
 	"name": "@rbxts/catalog",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"description": "A fast library for searching a large group of items",
 	"main": "src/init.luau",
 	"types": "index.d.ts",

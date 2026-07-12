@@ -19,6 +19,11 @@ export type SortKey = {
 
 export type SortOptions = SortKey | { SortKey }
 
+export type TextSearchOptions = {
+	caseInsensitive: boolean?,
+	sort: SortOptions?,
+}
+
 export type Predicate = (item: Item) -> boolean
 
 export type CatalogData = {

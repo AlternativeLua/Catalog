@@ -27,6 +27,13 @@ declare namespace Catalog {
 	/** A single sort key, or an array of keys where earlier keys take priority. */
 	export type SortOptions<P extends Parameters = Parameters> = SortKey<P> | ReadonlyArray<SortKey<P>>;
 
+	/** Options for `SearchText`. */
+	export interface TextSearchOptions<P extends Parameters = Parameters> {
+		/** Match regardless of case (pattern and values are lowercased). Defaults to false. */
+		caseInsensitive?: boolean;
+		sort?: SortOptions<P>;
+	}
+
 	export type Predicate<P extends Parameters = Parameters, D = unknown> = (item: Item<P, D>) => boolean;
 
 	/**
@@ -93,6 +100,31 @@ declare const Catalog: {
 
 	BulkRemoveFromCatalog(this: void, catalog: Catalog.CatalogData<any, any>, ids: ReadonlyArray<string>): void;
 
+	/**
+	 * Sets a single parameter on an existing item, keeping the index in sync.
+	 * Pass `undefined` to remove the parameter. Returns false if no item with
+	 * `id` exists. Always use this (or `UpdateParameters`) instead of mutating
+	 * `item.parameters` directly, which silently corrupts the index.
+	 */
+	SetParameter<P extends Catalog.Parameters, D, K extends keyof P & string>(
+		this: void,
+		catalog: Catalog.CatalogData<P, D>,
+		id: string,
+		parameter: K,
+		value: P[K] | undefined,
+	): boolean;
+
+	/**
+	 * Merge-updates several parameters on an existing item at once, keeping
+	 * the index in sync. Returns false if no item with `id` exists.
+	 */
+	UpdateParameters<P extends Catalog.Parameters, D>(
+		this: void,
+		catalog: Catalog.CatalogData<P, D>,
+		id: string,
+		parameters: Partial<P>,
+	): boolean;
+
 	Get<P extends Catalog.Parameters, D>(
 		this: void,
 		catalog: Catalog.CatalogData<P, D>,
@@ -102,9 +134,11 @@ declare const Catalog: {
 	Has(this: void, catalog: Catalog.CatalogData<any, any>, id: string): boolean;
 
 	/**
-	 * Equality search over **indexed** parameters (inverted index). Multiple
-	 * parameters are AND-ed together. Searching a parameter that was not
-	 * indexed returns no results.
+	 * Equality search. Multiple parameters are AND-ed together. Indexed
+	 * parameters resolve through the inverted index; non-indexed parameters
+	 * are filtered linearly against those candidates (a full scan when no
+	 * indexed parameter is present), so results are correct either way —
+	 * indexing is purely a performance optimization.
 	 */
 	Search<P extends Catalog.Parameters, D>(
 		this: void,
@@ -113,13 +147,17 @@ declare const Catalog: {
 		sort?: Catalog.SortOptions<P>,
 	): Array<Catalog.Item<P, D>>;
 
-	/** Substring search over a string parameter (Boyer-Moore, O(n) full scan). */
+	/**
+	 * Substring search over a string parameter (Boyer-Moore, O(n) full scan).
+	 * The last argument accepts either plain sort options or a
+	 * `TextSearchOptions` table (`{ caseInsensitive?, sort? }`).
+	 */
 	SearchText<P extends Catalog.Parameters, D>(
 		this: void,
 		catalog: Catalog.CatalogData<P, D>,
 		parameter: keyof P & string,
 		pattern: string,
-		sort?: Catalog.SortOptions<P>,
+		options?: Catalog.SortOptions<P> | Catalog.TextSearchOptions<P>,
 	): Array<Catalog.Item<P, D>>;
 
 	/**

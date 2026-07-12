@@ -16,9 +16,28 @@ local function countKeys(set: { [string]: true }): number
 	return n
 end
 
-local function Search(self: CatalogData, params: SearchParams): { Item }
-	local sets: { { [string]: true } } = {}
+local function matchesAll(item: Item, params: SearchParams): boolean
 	for parameter, value in params do
+		if item.parameters[parameter] ~= value then
+			return false
+		end
+	end
+	return true
+end
+
+local function Search(self: CatalogData, params: SearchParams): { Item }
+	local indexed = self.indexed
+	local sets: { { [string]: true } } = {}
+	local residual: SearchParams? = nil
+
+	for parameter, value in params do
+		if indexed and not indexed[parameter] then
+			local target = residual or {}
+			target[parameter] = value
+			residual = target
+			continue
+		end
+
 		local byValue = self.index[parameter]
 		local ids = byValue and byValue[value]
 		if not ids then
@@ -31,7 +50,9 @@ local function Search(self: CatalogData, params: SearchParams): { Item }
 
 	if #sets == 0 then
 		for _, item in self.byId do
-			table.insert(results, item)
+			if not residual or matchesAll(item, residual) then
+				table.insert(results, item)
+			end
 		end
 		return results
 	end
@@ -57,7 +78,7 @@ local function Search(self: CatalogData, params: SearchParams): { Item }
 
 		if inAll then
 			local item = self.byId[id]
-			if item then
+			if item and (not residual or matchesAll(item, residual)) then
 				table.insert(results, item)
 			end
 		end

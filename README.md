@@ -3,7 +3,7 @@ A fast library for searching a large group of items
 
 ## Installation
 
-- **Wally (Luau):** `catalog = "alternativelua/catalog@0.3.0"` or through releases
+- **Wally (Luau):** `catalog = "alternativelua/catalog@0.4.0"` or through releases
 - **npm (roblox-ts):** `npm install @rbxts/catalog`
 
 ## Usage
@@ -29,12 +29,26 @@ Catalog.BulkAddToCatalog(cat, {
 	{ id = "potion_01", parameters = { category = "consumable", rarity = "common", tier = 3 } },
 })
 
--- Equality search over indexed parameters (fast, inverted index).
--- Multiple parameters are AND-ed together.
+-- Equality search. Multiple parameters are AND-ed together. Indexed
+-- parameters go through the inverted index (fast); non-indexed ones are
+-- filtered linearly against those candidates, so results are always correct.
 local legendaryWeapons = Catalog.Search(cat, { category = "weapon", rarity = "legendary" })
+
+-- Update parameters on an existing item; the index stays in sync.
+-- (Never mutate item.parameters directly — that corrupts the index.)
+Catalog.SetParameter(cat, "sword_01", "tier", 43)
+Catalog.SetParameter(cat, "sword_01", "event", nil) -- nil removes the parameter
+Catalog.UpdateParameters(cat, "sword_01", { rarity = "mythic", tier = 44 })
 
 -- Substring search over a string parameter (Boyer-Moore, full scan).
 local swords = Catalog.SearchText(cat, "name", "sword")
+
+-- Case-insensitive substring search; combine with sort via the options table.
+local anySwords = Catalog.SearchText(cat, "name", "SWORD", { caseInsensitive = true })
+local sortedSwords = Catalog.SearchText(cat, "name", "sword", {
+	caseInsensitive = true,
+	sort = { parameter = "tier", direction = "descending" },
+})
 
 -- Sort results by passing sort options as the last argument to either
 -- search function. Direction defaults to "ascending".
@@ -103,21 +117,21 @@ const hardHitters = Catalog.SearchCustom(cat, (item) => item.data !== undefined 
 
 ## Performance
 
-Benchmarked on **100,000 items** (Catalog v0.1.0). Each item has `category`,
+Benchmarked on **100,000 items** (Catalog v0.4.0). Each item has `category`,
 `rarity`, `tier`, and `name` parameters; `category`, `rarity`, and `tier` are
 indexed. See [`test/init.server.luau`](test/init.server.luau) for the harness.
 
 | Operation | Method | Time | Results |
 | --- | --- | --- | --- |
-| Build the catalog | `BulkAddToCatalog` (100k items) | **29.42 ms** total | — |
-| Equality search, high-selectivity | `Search { tier = 42 }` | **0.0372 ms/op** | 1,000 |
-| Equality search, low-selectivity | `Search { category = "weapon" }` | **0.7400 ms/op** | 20,000 |
-| Equality search, intersection | `Search { category = "weapon", rarity = "legendary" }` | **0.7422 ms/op** | 4,000 |
-| Substring search, matching | `SearchText(name, "sword")` | **22.6112 ms/op** | 20,000 |
-| Substring search, no match | `SearchText(name, "<no match>")` | **15.0984 ms/op** | 0 |
-| Custom search, predicate | `SearchCustom(tier >= 90)` | **12.4424 ms/op** | 10,000 |
-| Sorted search, single key | `Search { category = "weapon" }` + sort `tier` desc | **10.2109 ms/op** | 20,000 |
-| Sorted search, multi-key | `Search { category = "weapon" }` + sort `rarity`, `tier` desc | **12.5169 ms/op** | 20,000 |
+| Build the catalog | `BulkAddToCatalog` (100k items) | **31.46 ms** total | — |
+| Equality search, high-selectivity | `Search { tier = 42 }` | **0.0298 ms/op** | 1,000 |
+| Equality search, low-selectivity | `Search { category = "weapon" }` | **0.6725 ms/op** | 20,000 |
+| Equality search, intersection | `Search { category = "weapon", rarity = "legendary" }` | **0.7151 ms/op** | 4,000 |
+| Substring search, matching | `SearchText(name, "sword")` | **22.9133 ms/op** | 20,000 |
+| Substring search, no match | `SearchText(name, "<no match>")` | **15.2455 ms/op** | 0 |
+| Custom search, predicate | `SearchCustom(tier >= 90)` | **11.2289 ms/op** | 10,000 |
+| Sorted search, single key | `Search { category = "weapon" }` + sort `tier` desc | **10.0535 ms/op** | 20,000 |
+| Sorted search, multi-key | `Search { category = "weapon" }` + sort `rarity`, `tier` desc | **12.3270 ms/op** | 20,000 |
 | Direct lookup by id | `Get("item_50000")` | **~0.0000 ms/op** | — |
 
 ### Notes
@@ -126,6 +140,10 @@ indexed. See [`test/init.server.luau`](test/init.server.luau) for the harness.
   *matching* items, not the catalog size. Multi-parameter queries intersect on
   the smallest result set first, which is why `weapon + legendary` (4,000 hits)
   runs about as fast as `weapon` alone despite the extra filter.
+- **Non-indexed parameters** in a `Search` query are filtered linearly: against
+  the candidates produced by the indexed parameters when there are any, or as a
+  full scan otherwise. Results are always correct; indexing a parameter only
+  makes querying it faster.
 - **Substring search** (`SearchText`) is a Boyer-Moore, O(n) scan over every
   item, since arbitrary substrings can't be indexed. The no-match case is
   slightly faster because it never allocates result entries; both cases visit
@@ -133,8 +151,8 @@ indexed. See [`test/init.server.luau`](test/init.server.luau) for the harness.
 - **Custom search** (`SearchCustom`) calls the predicate once per item, so it
   is also an O(n) scan; cost is the scan plus whatever the predicate does.
 - **Sorted search** adds the sort cost on top of the search: sorting the
-  20,000 `weapon` hits by `tier` costs about 9.5 ms over the 0.74 ms unsorted
-  search, and the two-key sort about 11.8 ms. Cost scales with the *result*
+  20,000 `weapon` hits by `tier` costs about 9.4 ms over the 0.67 ms unsorted
+  search, and the two-key sort about 11.7 ms. Cost scales with the *result*
   count, not the catalog size.
 - **Direct lookup** (`Get`) is a single hash-map read and effectively free
   (below timer resolution across 100k iterations).
@@ -159,6 +177,18 @@ on flat arrays instead of hashing into `item.parameters` on every comparison.
 When a key's values are uniformly numbers or strings with none missing, a raw
 `<` fast path is used. Compared to a naive `table.sort` comparator this is
 roughly 2–3.5x faster for single-key sorts and 1.4–2x for multi-key.
+
+## Updating items
+
+`Catalog.SetParameter(cat, id, parameter, value)` changes one parameter on an
+existing item and reindexes only that parameter; passing `nil` removes the
+parameter. `Catalog.UpdateParameters(cat, id, { ... })` merge-updates several
+at once. Both return `false` when no item with `id` exists. To replace an item
+wholesale, `AddToCatalog` with the same id still works.
+
+Never mutate `item.parameters` on an item that is inside a catalog — the
+inverted index would keep pointing at the old values. `data` is not indexed,
+so mutating the payload directly is fine.
 
 ## Custom search
 

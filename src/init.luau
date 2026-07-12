@@ -15,6 +15,7 @@ export type Predicate = Types.Predicate
 export type SortDirection = Types.SortDirection
 export type SortKey = Types.SortKey
 export type SortOptions = Types.SortOptions
+export type TextSearchOptions = Types.TextSearchOptions
 
 local Catalog = {}
 
@@ -37,47 +38,55 @@ function Catalog.new(indexedParameters: { string }?): CatalogData
 	}
 end
 
-local function indexItem(self: CatalogData, item: Item)
+local function indexEntry(self: CatalogData, id: string, parameter: string, value: Types.Value)
 	local indexed = self.indexed
+	if indexed and not indexed[parameter] then
+		return
+	end
+
+	local byValue = self.index[parameter]
+	if not byValue then
+		byValue = {}
+		self.index[parameter] = byValue
+	end
+
+	local ids = byValue[value]
+	if not ids then
+		ids = {}
+		byValue[value] = ids
+	end
+
+	ids[id] = true
+end
+
+local function deindexEntry(self: CatalogData, id: string, parameter: string, value: Types.Value)
+	local byValue = self.index[parameter]
+	if not byValue then
+		return
+	end
+
+	local ids = byValue[value]
+	if ids then
+		ids[id] = nil
+		if next(ids) == nil then
+			byValue[value] = nil
+		end
+	end
+
+	if next(byValue) == nil then
+		self.index[parameter] = nil
+	end
+end
+
+local function indexItem(self: CatalogData, item: Item)
 	for parameter, value in item.parameters do
-		if indexed and not indexed[parameter] then
-			continue
-		end
-
-		local byValue = self.index[parameter]
-		if not byValue then
-			byValue = {}
-			self.index[parameter] = byValue
-		end
-
-		local ids = byValue[value]
-		if not ids then
-			ids = {}
-			byValue[value] = ids
-		end
-
-		ids[item.id] = true
+		indexEntry(self, item.id, parameter, value)
 	end
 end
 
 local function deindexItem(self: CatalogData, item: Item)
 	for parameter, value in item.parameters do
-		local byValue = self.index[parameter]
-		if not byValue then
-			continue
-		end
-
-		local ids = byValue[value]
-		if ids then
-			ids[item.id] = nil
-			if next(ids) == nil then
-				byValue[value] = nil
-			end
-		end
-
-		if next(byValue) == nil then
-			self.index[parameter] = nil
-		end
+		deindexEntry(self, item.id, parameter, value)
 	end
 end
 
@@ -114,6 +123,38 @@ function Catalog.BulkRemoveFromCatalog(self: CatalogData, ids: { string })
 	end
 end
 
+function Catalog.SetParameter(self: CatalogData, id: string, parameter: string, value: Types.Value?): boolean
+	local item = self.byId[id]
+	if not item then
+		return false
+	end
+
+	local old = item.parameters[parameter]
+	if old == value then
+		return true
+	end
+
+	if old ~= nil then
+		deindexEntry(self, id, parameter, old)
+	end
+	(item.parameters :: { [string]: Types.Value? })[parameter] = value
+	if value ~= nil then
+		indexEntry(self, id, parameter, value)
+	end
+	return true
+end
+
+function Catalog.UpdateParameters(self: CatalogData, id: string, parameters: Types.Parameters): boolean
+	if not self.byId[id] then
+		return false
+	end
+
+	for parameter, value in parameters do
+		Catalog.SetParameter(self, id, parameter, value)
+	end
+	return true
+end
+
 function Catalog.Get(self: CatalogData, id: string): Item?
 	return self.byId[id]
 end
@@ -130,14 +171,39 @@ function Catalog.Search(self: CatalogData, params: SearchParams, sort: SortOptio
 	return results
 end
 
-function Catalog.SearchText(self: CatalogData, parameter: string, pattern: string, sort: SortOptions?): { Item }
+function Catalog.SearchText(
+	self: CatalogData,
+	parameter: string,
+	pattern: string,
+	options: (SortOptions | TextSearchOptions)?
+): { Item }
+	local sort: SortOptions? = nil
+	local caseInsensitive = false
+	if options then
+		local raw = options :: any
+		if raw.parameter ~= nil or raw[1] ~= nil then
+			-- Plain sort options, the pre-0.4.0 fourth argument.
+			sort = options :: SortOptions
+		else
+			caseInsensitive = raw.caseInsensitive == true
+			sort = raw.sort
+		end
+	end
+
+	if caseInsensitive then
+		pattern = string.lower(pattern)
+	end
+
 	local matcher = BoyerMoore.compile(pattern)
 	local results: { Item } = {}
 
 	for _, item in self.byId do
 		local value = item.parameters[parameter]
-		if type(value) == "string" and BoyerMoore.contains(matcher, value) then
-			table.insert(results, item)
+		if type(value) == "string" then
+			local text = if caseInsensitive then string.lower(value) else value
+			if BoyerMoore.contains(matcher, text) then
+				table.insert(results, item)
+			end
 		end
 	end
 
